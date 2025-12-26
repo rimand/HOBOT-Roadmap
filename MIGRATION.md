@@ -26,7 +26,7 @@
 - `.env.example` - Environment variables template
 
 ### ไฟล์เดิม
-- `index.html` - เก็บไว้เป็น reference แต่ไม่ใช้แล้ว
+- `index.html` - ถูกลบแล้ว (ไม่จำเป็น)
 
 ## การย้ายข้อมูล
 
