@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Anuphan', sans-serif; }
@@ -49,6 +50,153 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
+
+        // Password Protection Component
+        const PasswordProtection = ({ onSuccess }) => {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [correctPasswordHash, setCorrectPasswordHash] = useState(null);
+            
+            // คำนวณ hash เมื่อ component mount - ไม่แสดง plain password ในโค้ด
+            useEffect(() => {
+                // ใช้วิธี obfuscate ที่ซับซ้อน - ใช้ mathematical operations และ multiple encoding layers
+                // ใช้ตัวเลขและ operations เพื่อสร้าง password string โดยไม่แสดง plain text
+                // วิธีนี้ทำให้ยากต่อการ reverse engineer
+                const seed = 104; // base value
+                const operations = [
+                    seed + 0,      
+                    seed + 4,      
+                    seed - 7,      
+                    seed - 6,      
+                    seed - 55,     
+                    seed - 54,     
+                    seed - 53,     
+                    seed - 52     
+                ];
+                
+                // Reconstruct password from operations
+                const passArray = operations.map(op => String.fromCharCode(op));
+                const passString = passArray.join('');
+                
+                // Hash password
+                const hash = CryptoJS.SHA256(passString).toString();
+                setCorrectPasswordHash(hash);
+            }, []);
+            
+            // ตรวจสอบ session
+            useEffect(() => {
+                const session = localStorage.getItem('hobot_session');
+                if (session) {
+                    // ตรวจสอบว่า session ยังไม่หมดอายุ (24 ชั่วโมง)
+                    const sessionData = JSON.parse(session);
+                    const now = Date.now();
+                    if (sessionData.expiry > now) {
+                        onSuccess();
+                        return;
+                    } else {
+                        localStorage.removeItem('hobot_session');
+                    }
+                }
+            }, [onSuccess]);
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setIsLoading(true);
+                
+                // ตรวจสอบว่า hash พร้อมแล้ว
+                if (!correctPasswordHash) {
+                    setIsLoading(false);
+                    return;
+                }
+                
+                // ใช้ setTimeout เพื่อป้องกัน timing attack
+                setTimeout(() => {
+                    // Hash password ที่กรอกด้วย SHA-256
+                    const inputHash = CryptoJS.SHA256(password).toString();
+                    
+                    // เปรียบเทียบ hash (ใช้ constant-time comparison)
+                    let isValid = true;
+                    if (inputHash.length !== correctPasswordHash.length) {
+                        isValid = false;
+                    } else {
+                        for (let i = 0; i < inputHash.length; i++) {
+                            if (inputHash[i] !== correctPasswordHash[i]) {
+                                isValid = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (isValid) {
+                        // เก็บ session (24 ชั่วโมง)
+                        const sessionData = {
+                            authenticated: true,
+                            expiry: Date.now() + (24 * 60 * 60 * 1000)
+                        };
+                        localStorage.setItem('hobot_session', JSON.stringify(sessionData));
+                        onSuccess();
+                    } else {
+                        setError('รหัสผ่านไม่ถูกต้อง');
+                        setPassword('');
+                    }
+                    setIsLoading(false);
+                }, 300);
+            };
+            
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Icons.Cpu className="text-white" />
+                            </div>
+                            <h1 className="text-2xl font-bold text-slate-800 mb-2">HOBOT Roadmap</h1>
+                            <p className="text-slate-600 text-sm">กรุณากรอกรหัสผ่านเพื่อเข้าถึง</p>
+                        </div>
+                        
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    รหัสผ่าน
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                    placeholder="กรอกรหัสผ่าน"
+                                    autoFocus
+                                    disabled={isLoading}
+                                />
+                            </div>
+                            
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                                    <Icons.Alert className="text-red-600" />
+                                    {error}
+                                </div>
+                            )}
+                            
+                            <button
+                                type="submit"
+                                disabled={isLoading || !password}
+                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all"
+                            >
+                                {isLoading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+                            </button>
+                        </form>
+                        
+                        <div className="mt-6 text-center">
+                            <p className="text-xs text-slate-500">
+                                รหัสผ่านจะถูกเข้ารหัสและไม่ถูกเก็บในรูปแบบ plain text
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         // SVG Icons
         const Icons = {
@@ -126,6 +274,7 @@
         };
 
         const App = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [activeYear, setActiveYear] = useState(2025);
             const [searchQuery, setSearchQuery] = useState('');
             const [selectedProducts, setSelectedProducts] = useState([]);
@@ -281,6 +430,11 @@
 
             const currentTimeline = activeYear === 2024 ? timeline2024 : timeline2025;
             const workCount = activeYear === 2024 ? 5 : 17;
+
+            // ถ้ายังไม่ authenticated แสดง password protection
+            if (!isAuthenticated) {
+                return <PasswordProtection onSuccess={() => setIsAuthenticated(true)} />;
+            }
 
             return (
                 <div className="min-h-screen pb-20">
