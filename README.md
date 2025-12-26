@@ -2,7 +2,14 @@
 
 เว็บแอปพลิเคชันสำหรับแสดง Timeline และ Roadmap ของ HOBOT ตั้งแต่ปี 2024-2025 พร้อมฟีเจอร์การค้นหา กรองข้อมูล และแสดงรายละเอียดงานต่างๆ
 
+**เวอร์ชันใหม่**: ใช้ Next.js พร้อม Server-side Authentication เพื่อความปลอดภัยของรหัสผ่าน
+
 ## ✨ ฟีเจอร์
+
+### 🔐 Security
+- **Server-side Password Authentication**: รหัสผ่านถูกตรวจสอบที่ server ด้วย bcrypt
+- **Session Management**: ใช้ HTTP-only cookies สำหรับ session management
+- **Environment Variables**: รหัสผ่าน hash ถูกเก็บใน environment variables
 
 ### 📅 Timeline
 - แสดง Timeline แยกตามปี (2024 และ 2025)
@@ -42,32 +49,104 @@
 - **Responsive Design**: รองรับการแสดงผลบน mobile, tablet, และ desktop
 - **Print-friendly**: ซ่อน elements ที่ไม่จำเป็นเมื่อพิมพ์
 
-## 🚀 การใช้งาน
+## 🚀 การติดตั้งและใช้งาน
 
-### เปิดใช้งาน
-1. เปิดไฟล์ `index.html` ในเว็บเบราว์เซอร์
-2. ไม่ต้องติดตั้ง dependencies เพิ่มเติม (ใช้ CDN)
+### Prerequisites
+- Node.js 18+ 
+- npm หรือ yarn
 
-### การใช้งานพื้นฐาน
-- **สลับปี**: คลิกปุ่ม 2024 หรือ 2025 ที่ header
-- **ค้นหา**: เปิด Filter panel แล้วพิมพ์คำค้นหา
-- **กรองข้อมูล**: เลือก Product หรือ Type ที่ต้องการกรอง
-- **ดูรายละเอียด**: คลิกที่ timeline item เพื่อขยายดูรายการงาน
+### ขั้นตอนการติดตั้ง
+
+1. **Clone repository**
+```bash
+git clone <repository-url>
+cd "HOBOT Roadmap"
+```
+
+2. **ติดตั้ง dependencies**
+```bash
+npm install
+```
+
+3. **สร้าง Password Hash**
+
+สร้าง bcrypt hash สำหรับรหัสผ่านของคุณ:
+```bash
+node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('your_password_here', 10).then(console.log);"
+```
+
+คัดลอก hash ที่ได้มา
+
+4. **ตั้งค่า Environment Variables**
+
+สร้างไฟล์ `.env.local`:
+```bash
+cp .env.example .env.local
+```
+
+แก้ไข `.env.local` และใส่ password hash:
+```
+PASSWORD_HASH=your_bcrypt_hash_here
+NODE_ENV=development
+```
+
+5. **รัน Development Server**
+```bash
+npm run dev
+```
+
+เปิดเบราว์เซอร์ไปที่ [http://localhost:3000](http://localhost:3000)
+
+6. **Build สำหรับ Production**
+```bash
+npm run build
+npm start
+```
 
 ## 🛠️ เทคโนโลยีที่ใช้
 
+- **Next.js 14** - React Framework with Server-side Rendering
 - **React 18** - UI Framework
+- **TypeScript** - Type Safety
 - **Tailwind CSS** - Styling
-- **Babel Standalone** - JSX Transpilation
+- **bcryptjs** - Password Hashing
 - **Google Fonts (Anuphan)** - Thai Font
 
 ## 📁 โครงสร้างโปรเจกต์
 
 ```
 HOBOT Roadmap/
-├── index.html          # ไฟล์หลัก (Single Page Application)
-└── README.md          # เอกสารนี้
+├── pages/
+│   ├── api/
+│   │   └── auth/
+│   │       ├── login.ts      # API endpoint สำหรับ login
+│   │       ├── verify.ts     # API endpoint สำหรับ verify session
+│   │       └── logout.ts     # API endpoint สำหรับ logout
+│   ├── index.tsx             # หน้าแรก (Roadmap)
+│   ├── login.tsx             # หน้า login
+│   └── _app.tsx              # App wrapper
+├── components/
+│   └── Icons.tsx             # SVG Icons components
+├── lib/
+│   ├── auth.ts               # Client-side auth utilities
+│   ├── data.ts               # Timeline data
+│   └── sessions.ts           # Session management
+├── styles/
+│   └── globals.css            # Global styles
+├── middleware.ts             # Next.js middleware สำหรับ route protection
+├── package.json
+├── next.config.js
+├── tsconfig.json
+└── tailwind.config.js
 ```
+
+## 🔒 Security Features
+
+1. **Password Hashing**: ใช้ bcrypt สำหรับ hashing รหัสผ่าน (ปลอดภัยกว่า SHA-256)
+2. **HTTP-only Cookies**: Session tokens ถูกเก็บใน HTTP-only cookies เพื่อป้องกัน XSS attacks
+3. **Server-side Validation**: การตรวจสอบรหัสผ่านทำที่ server เท่านั้น
+4. **Environment Variables**: รหัสผ่าน hash ไม่ถูก commit ลง git
+5. **Session Expiry**: Session หมดอายุหลังจาก 24 ชั่วโมง
 
 ## 📝 ข้อมูลที่แสดง
 
@@ -94,6 +173,12 @@ HOBOT Roadmap/
 - Safari
 - Edge
 
+## 🚨 หมายเหตุสำคัญ
+
+- **อย่าลืมตั้งค่า PASSWORD_HASH ใน .env.local** ก่อนรันแอปพลิเคชัน
+- ใน production ควรใช้ Redis หรือ database สำหรับ session storage แทนการใช้ in-memory Map
+- ควรใช้ HTTPS ใน production environment
+
 ## 📄 License
 
 โปรเจกต์นี้เป็นของ HOBOT
@@ -104,5 +189,4 @@ HOBOT Team
 
 ---
 
-**หมายเหตุ**: เว็บแอปพลิเคชันนี้เป็น Single Page Application ที่ทำงานได้โดยไม่ต้องใช้ build process หรือ server
-
+**หมายเหตุ**: เวอร์ชันนี้ใช้ Next.js และมี server-side authentication เพื่อความปลอดภัยที่มากขึ้น
