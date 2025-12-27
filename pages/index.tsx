@@ -1,16 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import { timeline2024, timeline2025, productStats, TimelineItem } from '../lib/data';
+import { timeline2024, timeline2025, productStats } from '../lib/data';
 import { Icons } from '../components/Icons';
 import { verifySession, logout } from '../lib/auth';
 
-interface HomeProps {
-  isAuthenticated: boolean;
-}
-
-export default function Home({ isAuthenticated }: HomeProps) {
+export default function Home() {
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeYear, setActiveYear] = useState(2025);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -19,12 +15,17 @@ export default function Home({ isAuthenticated }: HomeProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [fadeKey, setFadeKey] = useState(0);
 
-  // Redirect to login if not authenticated
+  // Client-side authentication check
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, router]);
+    const checkAuth = () => {
+      const authenticated = verifySession();
+      setIsAuthenticated(authenticated);
+      if (!authenticated) {
+        router.push('/login');
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   // Handle year change with animation
   const handleYearChange = (year: number) => {
@@ -135,6 +136,20 @@ export default function Home({ isAuthenticated }: HomeProps) {
   const currentTimeline = activeYear === 2024 ? timeline2024 : timeline2025;
   const workCount = activeYear === 2024 ? 5 : 17;
 
+  // Show loading while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Icons.Cpu />
+          </div>
+          <p className="text-slate-600">กำลังตรวจสอบ...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return null; // Will redirect
   }
@@ -168,6 +183,14 @@ export default function Home({ isAuthenticated }: HomeProps) {
                 </button>
               ))}
             </div>
+            <button
+              onClick={logout}
+              className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all no-print"
+              aria-label="Logout"
+              title="ออกจากระบบ"
+            >
+              <Icons.X />
+            </button>
           </div>
         </div>
       </header>
@@ -487,57 +510,3 @@ function ScrollToTop() {
     </button>
   );
 }
-
-// Server-side authentication check
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const sessionToken = context.req.cookies.hobot_session;
-  
-  if (!sessionToken) {
-    console.log('Index page: No session token, redirecting to /login');
-    return {
-      redirect: {
-        destination: '/login',
-        permanent: false,
-      },
-    };
-  }
-
-  // Verify session directly
-  try {
-    const { getSession } = await import('../lib/sessions');
-    console.log('Index page: Checking session with token:', sessionToken.substring(0, 20) + '...');
-    const session = getSession(sessionToken);
-    
-    if (session) {
-      console.log('Index page: Session found, expiry:', new Date(session.expiry).toISOString());
-      console.log('Index page: Current time:', new Date().toISOString());
-      console.log('Index page: Is expired?', session.expiry < Date.now());
-    }
-    
-    if (session && session.expiry > Date.now()) {
-      console.log('Index page: Session valid, showing content');
-      return {
-        props: {
-          isAuthenticated: true,
-        },
-      };
-    } else {
-      if (!session) {
-        console.log('Index page: Session not found in memory');
-      } else {
-        console.log('Index page: Session expired');
-      }
-      console.log('Index page: Redirecting to /login');
-    }
-  } catch (error) {
-    console.error('Index page: Session verification error:', error);
-  }
-
-  return {
-    redirect: {
-      destination: '/login',
-      permanent: false,
-    },
-  };
-};
-

@@ -1,15 +1,27 @@
-import { useState } from 'react';
-import { GetServerSideProps } from 'next';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { login } from '../lib/auth';
+import { login, verifySession } from '../lib/auth';
 import { Icons } from '../components/Icons';
-import { getSession } from '../lib/sessions';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const router = useRouter();
+
+  // Check if already authenticated
+  useEffect(() => {
+    const checkAuth = () => {
+      const authenticated = verifySession();
+      if (authenticated) {
+        router.push('/');
+      } else {
+        setIsChecking(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,18 +29,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await login(password);
+      const result = login(password);
       
       if (result.success) {
         console.log('Login successful, redirecting...');
-        
-        // ใช้ window.location.replace เพื่อให้ browser reload และส่ง cookie
-        // เพิ่ม delay เพื่อให้ cookie ถูก set ก่อน redirect
-        setTimeout(() => {
-          console.log('Redirecting to /');
-          // ใช้ window.location.replace แทน href เพื่อป้องกัน back button
-          window.location.replace('/');
-        }, 300);
+        router.push('/');
       } else {
         setError(result.error || 'รหัสผ่านไม่ถูกต้อง');
         setPassword('');
@@ -36,11 +41,25 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ - กรุณาตรวจสอบ console');
+      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
       setPassword('');
       setIsLoading(false);
     }
   };
+
+  // Show loading while checking authentication
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Icons.Cpu />
+          </div>
+          <p className="text-slate-600">กำลังตรวจสอบ...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -87,41 +106,10 @@ export default function LoginPage() {
         
         <div className="mt-6 text-center">
           <p className="text-xs text-slate-500">
-            รหัสผ่านจะถูกตรวจสอบที่ server และไม่ถูกเก็บในรูปแบบ plain text
+            Static version สำหรับ GitHub Pages
           </p>
         </div>
       </div>
     </div>
   );
 }
-
-// Server-side: ถ้ามี session ถูกต้องแล้ว redirect ไปหน้าแรก
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const sessionToken = context.req.cookies.hobot_session;
-  
-  if (sessionToken) {
-    try {
-      const session = getSession(sessionToken);
-      
-      if (session && session.expiry > Date.now()) {
-        console.log('Login page: Session valid, redirecting to /');
-        return {
-          redirect: {
-            destination: '/',
-            permanent: false,
-          },
-        };
-      } else {
-        console.log('Login page: Session invalid or expired');
-      }
-    } catch (error) {
-      console.error('Login page: Session verification error:', error);
-    }
-  } else {
-    console.log('Login page: No session token found');
-  }
-
-  return {
-    props: {},
-  };
-};

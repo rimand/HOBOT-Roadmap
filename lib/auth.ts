@@ -1,50 +1,65 @@
-// Client-side authentication utilities
+// Client-side authentication utilities for static export (GitHub Pages)
+// หมายเหตุ: การตรวจสอบรหัสผ่านที่ client-side ไม่ปลอดภัยเท่า server-side
+// แต่จำเป็นสำหรับ static hosting เช่น GitHub Pages
 
-export async function verifySession(): Promise<boolean> {
+const AUTH_KEY = 'hobot_authenticated';
+const AUTH_EXPIRY_KEY = 'hobot_auth_expiry';
+
+// รหัสผ่านที่ใช้ (สำหรับ demo - ในโปรเจกต์จริงควรใช้ server-side auth)
+// คุณสามารถเปลี่ยนรหัสผ่านได้ที่นี่
+const CORRECT_PASSWORD = 'hlab1234';
+
+export function verifySession(): boolean {
+  if (typeof window === 'undefined') return false;
+  
   try {
-    const response = await fetch('/api/auth/verify');
-    const data = await response.json();
-    return data.authenticated === true;
+    const isAuthenticated = localStorage.getItem(AUTH_KEY);
+    const expiry = localStorage.getItem(AUTH_EXPIRY_KEY);
+    
+    if (isAuthenticated === 'true' && expiry) {
+      const expiryTime = parseInt(expiry, 10);
+      if (Date.now() < expiryTime) {
+        return true;
+      } else {
+        // Session expired
+        clearSession();
+      }
+    }
+    return false;
   } catch (error) {
     console.error('Session verification error:', error);
     return false;
   }
 }
 
-export async function login(password: string): Promise<{ success: boolean; error?: string }> {
+export function login(password: string): { success: boolean; error?: string } {
   try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ password }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
+    if (password === CORRECT_PASSWORD) {
+      // Set session for 24 hours
+      const expiry = Date.now() + 24 * 60 * 60 * 1000;
+      localStorage.setItem(AUTH_KEY, 'true');
+      localStorage.setItem(AUTH_EXPIRY_KEY, expiry.toString());
       return { success: true };
     } else {
-      // Log error for debugging
-      console.error('Login failed:', data.error);
-      return { success: false, error: data.error || 'Authentication failed' };
+      return { success: false, error: 'รหัสผ่านไม่ถูกต้อง' };
     }
   } catch (error) {
     console.error('Login error:', error);
-    return { success: false, error: 'Network error - กรุณาตรวจสอบว่า server กำลังรันอยู่' };
+    return { success: false, error: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' };
   }
 }
 
-export async function logout(): Promise<void> {
+export function logout(): void {
+  clearSession();
+  window.location.href = '/login';
+}
+
+function clearSession(): void {
   try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-    });
-    // Redirect to login page
-    window.location.href = '/login';
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(AUTH_EXPIRY_KEY);
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error('Clear session error:', error);
   }
 }
 
