@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "generate-hash": "node scripts/generate-password-hash.js"
+    "generate-hash": "node scripts/generate-password-hash.js",
+    "export": "next build"
   },
   "dependencies": {
     "next": "^14.0.4",
